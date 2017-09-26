@@ -3,7 +3,7 @@
 from __future__ import absolute_import, print_function, unicode_literals
 
 from logging import getLogger
-
+from datetime import datetime
 from requests import codes
 
 from prospyr.exceptions import ApiError
@@ -134,3 +134,33 @@ class Deletable(object):
 
 class ReadWritable(Creatable, Readable, Updateable, Deletable):
     pass
+
+
+class CustomFieldMixin(object):
+    class Meta:
+        abstract = True
+
+    def get_custom_field_value(cls, field_name):
+        """
+        Return custom field value depending on data type.
+        """
+        value = ''
+        for field in cls.custom_fields:
+            if field.name == field_name:
+                if field.value:
+                    if field.data_type in ['String', 'Text', 'Float', 'URL', 'Percentage', 'Currency']:
+                        value = field.value
+                    elif field.data_type == 'Dropdown':
+                        for option in field.options:
+                            if option['id'] == field.value:
+                                value = option['name']
+                    elif field.data_type == 'MultiSelect':
+                        values = []
+                        for val in field.value:
+                            for option in field.options:
+                                if option['id'] == val:
+                                    values.append(option['name'])
+                        value = ','.join(values)
+                    elif field.data_type == 'Date':
+                        value = datetime.fromtimestamp(field.value).date()
+        return value
