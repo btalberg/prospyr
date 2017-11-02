@@ -749,3 +749,13 @@ class Placeholder(object):
 
 class Project(Placeholder):
     pass
+
+
+class ContactType(SecondaryResource, mixins.Readable):
+    class Meta(object):
+        list_path = 'contact_types'
+
+    objects = ListOnlyManager()
+
+    id = fields.Integer(required=True)
+    name = fields.String()
