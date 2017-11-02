@@ -8,5 +8,5 @@ from prospyr.connection import connect
 from prospyr.resources import (Account, Activity, ActivityType, Company,
                                CustomerSource, Identifier, Lead, LossReason,
                                Opportunity, Person, Pipeline, PipelineStage,
-                               Task, User, Webhook, ContactType)
+                               Task, User, Webhook, CustomField, ContactType)
 from prospyr.version import VERSION
