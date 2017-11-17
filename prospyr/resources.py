@@ -13,7 +13,7 @@ from prospyr import connection, exceptions, mixins, schema
 from prospyr.exceptions import ApiError, ProspyrException
 from prospyr.fields import NestedIdentifiedResource, NestedResource, Unix
 from prospyr.mixins import CustomFieldMixin
-from prospyr.search import ActivityTypeListSet, ListSet, ResultSet
+from prospyr.search import ActivityTypeListSet, ListSet, ResultSet, RelatedRecordsListSet
 from prospyr.util import encode_typename, import_dotted_path, to_snake
 
 logger = getLogger(__name__)
@@ -277,7 +277,7 @@ class Resource(with_metaclass(ResourceMeta)):
                 raw_data=data,
                 resource_cls=type(self),
                 errors=errors,
-            )
+                )
 
         return data
 
@@ -345,10 +345,59 @@ class Related(object):
         return schema_attrs
 
 
+class RelatedRecordsManager(Manager):
+    _search_cls = RelatedRecordsListSet
+
+    def _raise_not_collection(self):
+        raise NotImplementedError('%s cannot be treated as a collection.' %
+                                  self.resource_cls.__name__)
+
+    def all(self):
+        self._raise_not_collection()
+
+    def get(self, id):
+        return self._search_cls(id=id,
+                         resource_cls=self.resource_cls,
+                         using=self.using)
+
+
+class _RelatedRecords(Resource, mixins.Readable):
+    class Meta(object):
+        pass
+
+    objects = RelatedRecordsManager()
+
+
+class PeopleRelatedRecords(_RelatedRecords):
+    class Meta(object):
+        list_path = 'people/{id}/related/'
+
+    id = fields.Integer()
+    type = fields.String()
+
+
+class CompaniesRelatedRecords(_RelatedRecords):
+    class Meta(object):
+        list_path = 'companies/{id}/related/'
+
+    id = fields.Integer()
+    type = fields.String()
+
+
+class OpportunitiesRelatedRecords(_RelatedRecords):
+    class Meta(object):
+        list_path = 'opportunities/{id}/related/'
+
+    id = fields.Integer()
+    type = fields.String()
+
+
 class CustomField(Resource, mixins.Readable):
     class Meta(object):
         list_path = 'custom_field_definitions/'
         detail_path = 'custom_field_definitions/{id}'
+
+    objects = ListOnlyManager()
 
     id = fields.Integer()
     name = fields.String()
@@ -522,24 +571,24 @@ class Opportunity(CustomFieldMixin, Resource, mixins.ReadWritable):
     close_date = Unix(allow_none=True)
     details = fields.String(allow_none=True)
     monetary_value = fields.Integer(allow_none=True)
-
+    assignee_id = fields.Integer(allow_none=True)
     assignee = Related(User)
     company = Related(Company)
     loss_reason = Related(LossReason)
     customer_source = Related(CustomerSource)
     pipeline = Related(Pipeline)
     pipeline_stage = Related(PipelineStage)
-    primary_contact = Related(Person, required=True)
+    primary_contact = Related(Person)
     priority = fields.String(
         allow_none=True,
         validate=OneOf(choices=('None', 'Low', 'Medium', 'High')),
     )
-    stage = fields.String(
+    status = fields.String(
         allow_none=True,
         validate=OneOf(choices=('Open', 'Won', 'Lost', 'Abandoned')),
     )
     tags = fields.List(fields.String)
-    win_probability = fields.Integer()
+    win_probability = fields.Integer(allow_none=True)
     date_created = Unix()
     date_modified = Unix()
     custom_fields = NestedResource(CustomField, many=True, schema=schema.CustomFieldSchema, custom_field=True)

@@ -2,8 +2,11 @@
 
 from __future__ import absolute_import, print_function, unicode_literals
 
+from datetime import datetime
 import functools
 import re
+import threading
+import time
 
 import requests
 from urlobject import URLObject
@@ -98,19 +101,40 @@ def url_join(base, *paths):
 
 class Connection(object):
 
+    TEN_MINUTES = 600
+
     def __init__(self, url, email, token, name='default', version='v1',
-                 cache=None):
+                 cache=None, rate_limit=600):
         self.session = Connection._get_session(email, token)
         self.email = email
         self.base_url = URLObject(url)
         self.api_url = self.base_url.add_path_segment(version)
         self.cache = InMemoryCache() if cache is None else cache
         self.name = name
+        self.rate_limit = rate_limit
+        self.last_api_call = None
 
     def http_method(self, method, url, *args, **kwargs):
         """
         Send HTTP request with `method` to `url`.
         """
+        lock = threading.RLock()
+
+        with lock:
+            if self.rate_limit:
+                if self.last_api_call:
+                    elapsed = (datetime.now() - self.last_api_call).total_seconds()
+                    if elapsed < 60 / self.rate_limit:
+                        sleep = 60 / self.rate_limit - elapsed
+                        # app.logger.debug("Enforcing rate limit by sleeping {0} elapsed".format(sleep))
+                        time.sleep(sleep)
+                # I decided to record the last api call time before the request, instead of after
+                # this is conservative, because the time to make the request is not included
+                # I considered timing if from after the super call returns, but there is some
+                # time spent on processing the result and, consequently, if you make a call
+                # immediately thereafter it /could/ be too quick
+                self.last_api_call = datetime.now()
+
         method_fn = getattr(self.session, method)
         return method_fn(url, *args, **kwargs)
 

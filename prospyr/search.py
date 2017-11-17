@@ -251,3 +251,33 @@ class ActivityTypeListSet(ListSet):
 
         for resource in self._build_resources(rows):
             yield resource
+
+
+class RelatedRecordsListSet(ListSet):
+    """
+    Special-case RelatedRecordsListSet's listing requiring ID
+    """
+    def __init__(self, id=None, resource_cls=None, using='default'):
+        self.id = id
+
+        from prospyr.resources import _RelatedRecords
+        if resource_cls is None:
+            resource_cls = _RelatedRecords
+        if not issubclass(resource_cls, _RelatedRecords):
+            raise ValueError('resource_cls must be a subclass of '
+                             '_RelatedRecords')
+        parent = super(RelatedRecordsListSet, self)
+        parent.__init__(resource_cls=resource_cls, using=using)
+
+    def _results_generator(self):
+        path = self._resource_cls.Meta.list_path.format(id=self.id)
+        url = self._conn.build_absolute_url(path)
+        resp = self._conn.get(url)
+
+        if resp.status_code != codes.ok:
+            raise exceptions.ApiError(resp.status_code, resp.text)
+
+        raw_data = resp.json()
+
+        for resource in self._build_resources(raw_data):
+            yield resource
