@@ -357,8 +357,8 @@ class RelatedRecordsManager(Manager):
 
     def get(self, id):
         return self._search_cls(id=id,
-                         resource_cls=self.resource_cls,
-                         using=self.using)
+                                resource_cls=self.resource_cls,
+                                using=self.using)
 
 
 class _RelatedRecords(Resource, mixins.Readable):
@@ -756,8 +756,9 @@ class Account(Resource, mixins.Singleton):
     name = fields.String()
 
 
-class Webhook(Resource, mixins.Readable):
+class Webhook(Resource, mixins.Readable, mixins.Creatable, mixins.Deletable):
     class Meta(object):
+        create_path = 'webhooks/'
         list_path = 'webhooks/'
         detail_path = 'webhooks/{id}/'
 
