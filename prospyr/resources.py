@@ -4,6 +4,7 @@ from __future__ import absolute_import, print_function, unicode_literals
 
 from logging import getLogger
 
+import copy
 from marshmallow import fields
 from marshmallow.validate import OneOf
 from requests import codes
@@ -12,7 +13,6 @@ from six import string_types, with_metaclass
 from prospyr import connection, exceptions, mixins, schema
 from prospyr.exceptions import ApiError, ProspyrException
 from prospyr.fields import NestedIdentifiedResource, NestedResource, Unix
-from prospyr.mixins import CustomFieldMixin
 from prospyr.search import ActivityTypeListSet, ListSet, ResultSet, RelatedRecordsListSet
 from prospyr.util import encode_typename, import_dotted_path, to_snake
 
@@ -265,12 +265,11 @@ class Resource(with_metaclass(ResourceMeta)):
         Without validating, write `data` onto the fields of this Resource.
         """
         for field, value in data.items():
-            setattr(self, field, value)
+            setattr(self, field, copy.deepcopy(value)) # deepcopy to resolve an issue with retaining nested fields values (custom_fields in particular)
 
-    @property
-    def _raw_data(self):
-        schema = self.Meta.schema
-        data, errors = schema.dump(self)
+    def _raw_data_using_schema(self, schema=None):
+        _schema = schema or self.Meta.schema
+        data, errors = _schema.dump(self)
         if errors:
             raise exceptions.ValidationError(
                 'Could not serialize %s data: %s' % (self, repr(errors)),
@@ -280,6 +279,10 @@ class Resource(with_metaclass(ResourceMeta)):
                 )
 
         return data
+
+    @property
+    def _raw_data(self):
+        return self._raw_data_using_schema()
 
 
 class SecondaryResource(Resource):
@@ -361,7 +364,7 @@ class RelatedRecordsManager(Manager):
                                 using=self.using)
 
 
-class _RelatedRecords(Resource, mixins.Readable):
+class _RelatedRecords(mixins.RelatedResourceMixin, Resource, mixins.ReadWritable):
     class Meta(object):
         pass
 
@@ -371,25 +374,34 @@ class _RelatedRecords(Resource, mixins.Readable):
 class PeopleRelatedRecords(_RelatedRecords):
     class Meta(object):
         list_path = 'people/{id}/related/'
+        create_path = 'people/{id}/related/'
 
     id = fields.Integer()
     type = fields.String()
+
+    resource = fields.Nested(schema.RelatedResourceSchema)
 
 
 class CompaniesRelatedRecords(_RelatedRecords):
     class Meta(object):
         list_path = 'companies/{id}/related/'
+        create_path = 'companies/{id}/related/'
 
     id = fields.Integer()
     type = fields.String()
+
+    resource = fields.Nested(schema.RelatedResourceSchema)
 
 
 class OpportunitiesRelatedRecords(_RelatedRecords):
     class Meta(object):
         list_path = 'opportunities/{id}/related/'
+        create_path = 'opportunities/{id}/related/'
 
     id = fields.Integer()
     type = fields.String()
+
+    resource = fields.Nested(schema.RelatedResourceSchema)
 
 
 class CustomField(Resource, mixins.Readable):
@@ -404,10 +416,10 @@ class CustomField(Resource, mixins.Readable):
     data_type = fields.String()
     currency = fields.String()
     options = fields.List(fields.Dict())
-    value = fields.String(allow_none=True)
+    value = fields.Raw(allow_none=True)
 
     def __str__(self):
-        return "{} - {}".format(self.name, self.data_type)
+        return "id: {}, name: {}, data_type: {}, options: {}, value: {}".format(getattr(self, 'id', None), getattr(self, 'name', None), getattr(self, 'data_type', None), getattr(self, 'options', None), getattr(self, 'value', ''))
 
 
 class User(Resource, mixins.Readable):
@@ -425,7 +437,7 @@ class User(Resource, mixins.Readable):
         return '{self.name} ({self.email})'.format(self=self)
 
 
-class Company(CustomFieldMixin, Resource, mixins.ReadWritable):
+class Company(mixins.CustomFieldMixin, Resource, mixins.ReadWritable):
     class Meta(object):
         create_path = 'companies/'
         search_path = 'companies/search/'
@@ -459,7 +471,7 @@ class Company(CustomFieldMixin, Resource, mixins.ReadWritable):
     custom_fields = NestedResource(CustomField, many=True, schema=schema.CustomFieldSchema, custom_field=True)
 
 
-class Person(CustomFieldMixin, Resource, mixins.ReadWritable):
+class Person(mixins.CustomFieldMixin, Resource, mixins.ReadWritable):
     class Meta(object):
         create_path = 'people/'
         search_path = 'people/search/'
@@ -544,7 +556,7 @@ class CustomerSource(SecondaryResource, mixins.Readable):
     name = fields.String(required=True)
 
 
-class Opportunity(CustomFieldMixin, Resource, mixins.ReadWritable):
+class Opportunity(mixins.CustomFieldMixin, Resource, mixins.ReadWritable):
     class Meta(object):
         create_path = 'opportunities/'
         search_path = 'opportunities/search/'
@@ -702,7 +714,7 @@ class Task(Resource, mixins.ReadWritable):
     date_modified = Unix()
 
 
-class Lead(CustomFieldMixin, Resource, mixins.ReadWritable):
+class Lead(mixins.CustomFieldMixin, Resource, mixins.ReadWritable):
     class Meta:
         create_path = 'leads/'
         search_path = 'leads/search'

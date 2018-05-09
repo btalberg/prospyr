@@ -78,8 +78,8 @@ class PhoneNumberSchema(NamedTupleSchema):
 
 
 class CustomFieldSchema(NamedTupleSchema):
-    custom_field_definition_id = fields.Integer()
-    # value = fields.String(allow_none=True)  # TODO base this on field definition
+    custom_field_definition_id = fields.Integer(attribute="id")
+    value = fields.Raw(allow_none=True)  # TODO base this on field definition
 
 
 class CustomFieldOptionSchema(Schema):
@@ -100,3 +100,8 @@ class PipelineStageSchema(NamedTupleSchema):
     id = fields.Integer(required=True)
     name = fields.String(required=True)
     win_probability = fields.Integer()
+
+
+class RelatedResourceSchema(Schema):
+    id = fields.Integer(required=True)
+    type = fields.String(required=True)

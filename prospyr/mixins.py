@@ -164,3 +164,29 @@ class CustomFieldMixin(object):
                     elif field.data_type == 'Date':
                         value = datetime.fromtimestamp(field.value).date()
         return value
+
+
+class RelatedResourceMixin(object):
+    def create(self, using='default'):
+        """
+        Create a new instance of this Resource. True on success.
+        """
+        if getattr(self, 'id', None) is None:
+            raise ValueError('%s cannot be created without an "id"' % self)
+        conn = self._get_conn(using)
+        path = self.Meta.create_path.format(id=self.id)
+
+        data = self._raw_data
+        data.pop('id')
+
+        resp = conn.post(conn.build_absolute_url(path), json=self._raw_data)
+
+        if resp.status_code in self._create_success_codes:
+            # data = self._load_raw(resp.json())
+            # self._set_fields(data)
+            return True
+        elif resp.status_code == codes.unprocessable_entity:
+            error = resp.json()
+            raise ValueError(error['message'])
+        else:
+            raise ApiError(resp.status_code, resp.text)

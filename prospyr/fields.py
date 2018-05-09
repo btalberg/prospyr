@@ -88,9 +88,14 @@ class NestedResource(fields.Field):
     """
 
     def __init__(self, resource_cls, default=missing_, many=False,
-                 id_only=False, custom_field=False, **kwargs):
+                 id_only=False, custom_field=False, schema=None, **kwargs):
         self.resource_cls = resource_cls
-        self.schema = type(resource_cls.Meta.schema)
+
+        if schema:
+            self.schema = schema()
+        else:
+            self.schema = type(resource_cls.Meta.schema)
+
         self.many = many
         self.id_only = id_only
         self.custom_field = custom_field
@@ -113,7 +118,14 @@ class NestedResource(fields.Field):
 
     @normalise_many
     def _serialize(self, values, attr, data):
-        return [value._raw_data for value in values]
+        resources = []
+        for value in values:
+            if self.custom_field:
+                data, _ = self.schema.dump({"id": value.id, "value": value.value})
+                resources.append(data)
+            else:
+                resources.append(value._raw_data_using_schema(self.schema))
+        return resources
 
 
 class NestedIdentifiedResource(fields.Field):
