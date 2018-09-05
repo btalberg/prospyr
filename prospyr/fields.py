@@ -6,6 +6,7 @@ from functools import wraps
 
 import arrow
 from arrow.parser import ParserError
+from logging import getLogger
 from marshmallow import ValidationError, fields
 from marshmallow.utils import missing as missing_
 from requests import codes
@@ -13,6 +14,8 @@ from requests import codes
 from prospyr import exceptions
 from prospyr.util import encode_typename, import_dotted_path
 from prospyr.validate import WhitespaceEmail
+
+logger = getLogger(__name__)
 
 
 class Unix(fields.Field):
@@ -109,9 +112,12 @@ class NestedResource(fields.Field):
             if self.id_only:
                 resources.append(self.resource_cls.objects.get(id=value['id']))
             elif self.custom_field:
-                resource = self.resource_cls.objects.get(id=value['custom_field_definition_id'])
-                resource.value = value['value']
-                resources.append(resource)
+                try:
+                    resource = self.resource_cls.objects.get(id=value['custom_field_definition_id'])
+                    resource.value = value['value']
+                    resources.append(resource)
+                except KeyError as error:
+                    logger.debug('Custom field resource %d missing! Known bug in Prosperworks, ignoring.', value['custom_field_definition_id'])
             else:
                 resources.append(self.resource_cls.from_api_data(value))
         return resources
