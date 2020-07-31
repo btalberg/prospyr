@@ -42,7 +42,7 @@ class Email(fields.Email):
     """
 
     def __init__(self, *args, **kwargs):
-        super(Email, self).__init__(self, *args, **kwargs)
+        super(Email, self).__init__(*args, **kwargs)
 
         # clobber the validator that superclass inserted with
         # whitespace-tolerant equivalent
