@@ -22,12 +22,12 @@ with open(os.path.join(here, 'prospyr/version.py')) as f:
 def just_packages(path):
     with open(path, encoding='utf-8') as f:
         reqs = list(f)
-    return [req.split('==')[0] for req in reqs
+    return [req for req in reqs
             if '==' in req and not req.startswith('#')]
 requirements = just_packages(os.path.join(here, 'requirements'))
 dev_requirements = just_packages(os.path.join(here, 'dev-requirements'))
 
-
+print(requirements)
 setup(
     name='prospyr',
     description='ProsperWorks client library',
